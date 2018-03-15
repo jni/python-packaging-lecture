@@ -1,0 +1,142 @@
+Why packaging? In a way, this school is about *reuse*, not repeating yourself, and growing not just your own toolset but the entire scientific Python ecosystem. There was a recent tweet that very much resonated with me: when you have a new idea as a biologist: man I hope no one has scooped me. when you have a new idea as an open source contributor: man I hope someone’s implemented this already.
+
+This lecture is all about import, and what happens when you type “import foo”. When you understand that, a lot of packaging and installation errors start to make sense and you 
+
+1) local modules in your working directory.
+
+make a file called foo.py
+
+define a function, say, groupby:
+
+from collections import defaultdict
+
+def groupby(sequence, by):
+    grouped = defaultdict(list)
+    for elem in sequence:
+        grouped[by(elem)].append(elem)
+
+now, in the same directory, run python and type:
+
+import foo
+foo  # prints the module file path
+
+dir(foo)  # prints the contents of foo, including the method and defaultdict. This is actually the *entire namespace of foo.py*
+
+So now we can define a function that operates on numbers:
+
+def even(num):
+    return num % 2 == 0
+
+and group some numbers:
+
+grouped_by_parity = foo.groupby(range(10), even)
+
+Let’s quit out of Python and try adding
+
+print(‘I’m foo and I’m being run!’)
+
+to the file. Now import again. You can see that the print statement gets run. In fact, importing *runs the Python code inside the file*. Then all of the variables inside the file are put in the module name’s “namespace”. Constants are also created and placed.
+
+Try import again. Nothing happens? Why? Module registry.
+
+There is an exception to the code being run. Anyone know what code *doesn’t* run when importing a Python file?
+
+if __name__ == ‘__main__’:
+
+Use that when you want to have both effects when running a Python file as a script, and also define functions that get used by other modules.
+
+
+now, modify foo.py so that it has a new function, say, aggregate:
+
+def aggregate(grouped, aggregator):
+    return {key: aggregator(seq) for key, seq in grouped.items()}
+
+Try:
+
+dir(foo)
+
+Nothing
+
+Try:
+
+import foo
+
+dir(foo)
+
+Still nothing. imports happen once into a singleton module object. If it’s already been imported, nothing happens.
+
+To re-import something, use reload:
+
+from importlib import reload
+reload(foo)
+
+2) installed local modules
+
+Now do
+
+import numpy
+
+Q: Where is the numpy file?
+
+Now exit out of Python, and write a new file, numpy.py, with just
+
+PI = 3.141592
+
+Now do
+
+import numpy
+
+Where is the source code now?
+
+So what Python is doing is importing things with a certain priority. How is that priority defined?
+
+PYTHONPATH
+
+and
+
+import sys
+sys.path
+
+When you “install” a Python package, all you’re doing is putting it in standard paths that Python looks in.
+
+3) making a local module installable
+
+setup.py files. Basically a huge mess, but reasonably ok to navigate once you know what you’re looking for.
+https://github.com/pypa/sampleproject/blob/master/setup.py
+
+setup.py sdist will hoover up all of your .py files into a tar.gz.
+
+If you want to include non .py files, you need to explicitly say so in MANIFEST.in
+
+4) Letting others install your module
+
+When you type “pip install foo”, pip searches in the Python Package Index (PyPI) for a matching name. If it finds it, it downloads the code and runs the setup.py from the code archive.
+
+So, all you need to do to share your code with others is make a setup.py file and then upload it to a repo.
+
+Now, we don’t want to overwhelm PyPI with a million test packages, so we are going to use test.pypi.org, a server basically for this purpose.
+
+To do this:
+https://test.pypi.org/account/register/
+make $HOME/.pypirc look like:
+[distutils]
+index-servers=
+    pypi
+    testpypi
+
+[testpypi]
+repository:https://test.pypi.org/legacy/
+username:yourtestpypiusername
+password:yourtestpypipassword
+
+Then:
+twine upload --repository testpypi dist/*
+
+References:
+
+Python Packaging Authority (PyPA)
+Python Packaging Guide
+https://github.com/pypa/sampleproject/blob/master/setup.py
+Jake VanderPlas’s myths and misconceptions about conda. Including his concise summary:
+pip install Python packages in any environment
+conda installs any package in conda environments
